@@ -110,329 +110,339 @@
   var engine = new BABYLON.Engine(canvas, true);
   var scene = new BABYLON.Scene(engine);
 
-  // Camera
-  var camera = new BABYLON.ArcRotateCamera("Camera", 
-    -Math.PI/2, Math.PI/2.5, 
-    50, 
-    BABYLON.Vector3.Zero(), 
-    scene
-  );
-  camera.attachControl(canvas, true);
-  camera.lowerBetaLimit = 0.01;
-  camera.upperBetaLimit = Math.PI - 0.01;
 
-  // Lights
-  var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
-  light.intensity = 0.7;
-  var dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(-1, -2, -1), scene);
-  dirLight.intensity = 0.5;
 
-  // Create gizmo manager
-  var gizmoManager = new BABYLON.GizmoManager(scene);
-  gizmoManager.positionGizmoEnabled = true;
+
+
+// Camera
+var camera = new BABYLON.ArcRotateCamera("Camera", 
+  -Math.PI/2, Math.PI/2.5, 
+  50, 
+  BABYLON.Vector3.Zero(), 
+  scene
+);
+camera.attachControl(canvas, true);
+camera.lowerBetaLimit = 0.01;
+camera.upperBetaLimit = Math.PI - 0.01;
+
+// Flip the Z-axis by rotating the camera
+camera.alpha = Math.PI; // Rotate 180 degrees around the Y-axis
+camera.beta = Math.PI / 2.5; // Adjust the elevation angle
+
+// Lights
+var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+light.intensity = 0.7;
+var dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(-1, -2, -1), scene);
+dirLight.intensity = 0.5;
+
+// Create gizmo manager
+var gizmoManager = new BABYLON.GizmoManager(scene);
+gizmoManager.positionGizmoEnabled = true;
+gizmoManager.attachableMeshes = [];
+gizmoManager.usePointerToAttachGizmos = false;
+
+// Store references to permanent scene objects
+var permanentObjects = ["Camera", "light", "dirLight"];
+var axesObjects = []; // Store references to axes objects
+
+// Declare meshToConfigMap at the top
+var meshToConfigMap = new Map(); // Maps mesh names to config keys
+
+// Other global variables
+var objectInfoDiv = document.getElementById("objectInfo");
+var downloadBtn = document.getElementById("downloadBtn");
+
+//---------------------------------------------------------------
+// Clear scene except permanent objects
+//---------------------------------------------------------------
+function clearScene() {
+  scene.meshes.slice().forEach(m => {
+    if (!permanentObjects.includes(m.name)) {
+      m.dispose(); // Dispose of all non-permanent meshes
+    }
+  });
+
+  // Clear gizmo attachable meshes
   gizmoManager.attachableMeshes = [];
-  gizmoManager.usePointerToAttachGizmos = false;
+  gizmoManager.attachToMesh(null);
 
-  // Store references to permanent scene objects
-  var permanentObjects = ["Camera", "light", "dirLight"];
-  var axesObjects = []; // Store references to axes objects
+  // Reset the mesh to config map
+  meshToConfigMap.clear(); // Now meshToConfigMap is defined
+
+  // Clear axes objects array
+  axesObjects.forEach(obj => {
+    if (obj) obj.dispose();
+  });
+  axesObjects = [];
+
+  // Reset object info
+  objectInfoDiv.textContent = "No object selected";
+}
+
+//---------------------------------------------------------------
+// 1) Draw coordinate axes
+//---------------------------------------------------------------
+function createCoordinateAxes(size = 10) {
+  // Clear any existing axes
+  axesObjects.forEach(obj => {
+    if (obj) obj.dispose();
+  });
+  axesObjects = [];
+
+  // Create axes with specified size
+  function makeAxis(name, start, end, color) {
+    var axis = BABYLON.MeshBuilder.CreateLines(name, {
+      points: [start, end],
+      updatable: true
+    }, scene);
+    axis.color = color;
+    // Don't make axes pickable
+    axis.isPickable = false;
+    return axis;
+  }
+
+  // Create main axes
+  var xAxis = makeAxis("xAxis", BABYLON.Vector3.Zero(), new BABYLON.Vector3(size, 0, 0), new BABYLON.Color3(1, 0, 0));
+  var yAxis = makeAxis("yAxis", BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, size, 0), new BABYLON.Color3(0, 1, 0));
+  var zAxis = makeAxis("zAxis", BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, 0, -size), new BABYLON.Color3(0, 0, 1)); // Flip Z-axis
+    
+  axesObjects.push(xAxis, yAxis, zAxis);
   
-  // Store the current configuration and mesh references
-  var currentConfig = null;
-  var meshToConfigMap = new Map(); // Maps mesh names to config keys
-  var objectInfoDiv = document.getElementById("objectInfo");
-  var downloadBtn = document.getElementById("downloadBtn");
+  // Axis labels
+  function createAxisLabel(txt, pos, color) {
+    var dt = new BABYLON.DynamicTexture("AxisLabel"+txt, {width:64, height:64}, scene);
+    dt.hasAlpha = true;
+    dt.drawText(txt, null, 48, "bold 48px Arial", color.toHexString(), "transparent");
 
-  //---------------------------------------------------------------
-  // Clear scene except permanent objects
-  //---------------------------------------------------------------
-  function clearScene() {
-    scene.meshes.slice().forEach(m => {
-      if (!permanentObjects.includes(m.name)) {
-        m.dispose();
-      }
-    });
-    
-    // Clear gizmo attachable meshes
-    gizmoManager.attachableMeshes = [];
-    gizmoManager.attachToMesh(null);
-    
-    // Reset the mesh to config map
-    meshToConfigMap.clear();
-    
-    // Clear axes objects array
-    axesObjects = [];
-    
-    // Reset object info
-    objectInfoDiv.textContent = "No object selected";
-  }
+    var plane = BABYLON.MeshBuilder.CreatePlane("Label_"+txt, {width:1, height:1}, scene);
+    plane.position = pos;
+    plane.isPickable = false;
 
-  //---------------------------------------------------------------
-  // 1) Draw coordinate axes
-  //---------------------------------------------------------------
-  function createCoordinateAxes(size = 10) {
-    // Clear any existing axes
-    axesObjects.forEach(obj => {
-      if (obj) obj.dispose();
-    });
-    axesObjects = [];
-
-    // Create axes with specified size
-    function makeAxis(name, start, end, color) {
-      var axis = BABYLON.MeshBuilder.CreateLines(name, {
-        points: [start, end],
-        updatable: true
-      }, scene);
-      axis.color = color;
-      // Don't make axes pickable
-      axis.isPickable = false;
-      return axis;
-    }
-
-    // Create main axes
-    var xAxis = makeAxis("xAxis", BABYLON.Vector3.Zero(), new BABYLON.Vector3(size, 0, 0), new BABYLON.Color3(1, 0, 0));
-    var yAxis = makeAxis("yAxis", BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, size, 0), new BABYLON.Color3(0, 1, 0));
-    var zAxis = makeAxis("zAxis", BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, 0, size), new BABYLON.Color3(0, 0, 1));
-    
-    axesObjects.push(xAxis, yAxis, zAxis);
-    
-    // Axis labels
-    function createAxisLabel(txt, pos, color) {
-      var dt = new BABYLON.DynamicTexture("AxisLabel"+txt, {width:64, height:64}, scene);
-      dt.hasAlpha = true;
-      dt.drawText(txt, null, 48, "bold 48px Arial", color.toHexString(), "transparent");
-
-      var plane = BABYLON.MeshBuilder.CreatePlane("Label_"+txt, {width:1, height:1}, scene);
-      plane.position = pos;
-      plane.isPickable = false;
-
-      var mat = new BABYLON.StandardMaterial("Mat_"+txt, scene);
-      mat.diffuseTexture = dt;
-      mat.opacityTexture = dt;
-      mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-      mat.backFaceCulling = false;
-      mat.emissiveColor = color;
-      plane.material = mat;
-
-      plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-      
-      axesObjects.push(plane);
-      return plane;
-    }
-    
-    createAxisLabel("X", new BABYLON.Vector3(size + 1, 0, 0), new BABYLON.Color3(1, 0, 0));
-    createAxisLabel("Y", new BABYLON.Vector3(0, size + 1, 0), new BABYLON.Color3(0, 1, 0));
-    createAxisLabel("Z", new BABYLON.Vector3(0, 0, size + 1), new BABYLON.Color3(0, 0, 1));
-  }
-
-  //---------------------------------------------------------------
-  // 2) Interpreting location for boundary conditions
-  //---------------------------------------------------------------
-  function interpretLocationComponent(spec, cmin, cmax) {
-    if (spec === ":") return null;  // means "all" in that dimension
-    if (typeof spec === "number") {
-      // if in [0,1], treat as fraction; else absolute coordinate
-      if (spec >= 0 && spec <= 1) {
-        return cmin + spec*(cmax - cmin);
-      } else {
-        return spec;
-      }
-    }
-    if (typeof spec === "string" && spec.trim().endsWith("%")) {
-      var frac = parseFloat(spec.replace("%",""))/100;
-      frac = Math.min(Math.max(frac,0),1);
-      return cmin + frac*(cmax - cmin);
-    }
-    throw "Invalid location component: " + spec;
-  }
-
-  //---------------------------------------------------------------
-  // 3) Create Arrows
-  //---------------------------------------------------------------
-  function createArrow(name, tip, direction, length, color) {
-    var tail = tip.subtract(direction.scale(length));
-    var shaftHeight = length * 0.8;
-    var coneHeight  = length * 0.2;
-
-    // Cylinder for shaft
-    var shaft = BABYLON.MeshBuilder.CreateCylinder(name+"_shaft", {
-      height: shaftHeight,
-      diameter: 0.3
-    }, scene);
-    shaft.position = tail.add(direction.scale(shaftHeight/2));
-
-    // Cone for arrow tip
-    var cone = BABYLON.MeshBuilder.CreateCylinder(name+"_cone", {
-      height: coneHeight,
-      diameterTop: 0,
-      diameterBottom: 0.6
-    }, scene);
-    cone.position = tip.subtract(direction.scale(coneHeight/2));
-
-    // Rotate so Y-up aligns with direction
-    var defaultDir = new BABYLON.Vector3(0,1,0);
-    var angle = Math.acos(BABYLON.Vector3.Dot(defaultDir, direction));
-    if (angle > 1e-6) {
-      var axis = BABYLON.Vector3.Cross(defaultDir, direction).normalize();
-      var quat = BABYLON.Quaternion.RotationAxis(axis, angle);
-      shaft.rotationQuaternion = quat;
-      cone.rotationQuaternion = quat;
-    }
-
-    // Merge
-    var mat = new BABYLON.StandardMaterial(name+"_mat", scene);
-    mat.diffuseColor = color || new BABYLON.Color3(1,1,1);
-    var arrow = BABYLON.Mesh.MergeMeshes([shaft, cone], true, false, null, false, true);
-    arrow.material = mat;
-    return arrow;
-  }
-
-  //---------------------------------------------------------------
-  // 4) Create Domain Block (translucent yellow)
-  //---------------------------------------------------------------
-  function createDomainBlock(dims) {
-    // wireframe lines for the domain
-    var corners = [
-      // bottom
-      [dims.xMin, dims.yMin, dims.zMin], [dims.xMax, dims.yMin, dims.zMin],
-      [dims.xMax, dims.yMin, dims.zMin], [dims.xMax, dims.yMax, dims.zMin],
-      [dims.xMax, dims.yMax, dims.zMin], [dims.xMin, dims.yMax, dims.zMin],
-      [dims.xMin, dims.yMax, dims.zMin], [dims.xMin, dims.yMin, dims.zMin],
-      // top
-      [dims.xMin, dims.yMin, dims.zMax], [dims.xMax, dims.yMin, dims.zMax],
-      [dims.xMax, dims.yMin, dims.zMax], [dims.xMax, dims.yMax, dims.zMax],
-      [dims.xMax, dims.yMax, dims.zMax], [dims.xMin, dims.yMax, dims.zMax],
-      [dims.xMin, dims.yMax, dims.zMax], [dims.xMin, dims.yMin, dims.zMax],
-      // verticals
-      [dims.xMin, dims.yMin, dims.zMin], [dims.xMin, dims.yMin, dims.zMax],
-      [dims.xMax, dims.yMin, dims.zMin], [dims.xMax, dims.yMin, dims.zMax],
-      [dims.xMin, dims.yMax, dims.zMin], [dims.xMin, dims.yMax, dims.zMax],
-      [dims.xMax, dims.yMax, dims.zMin], [dims.xMax, dims.yMax, dims.zMax]
-    ];
-    for (var i=0; i<corners.length; i+=2) {
-      let pts = [
-        new BABYLON.Vector3(corners[i][0],   corners[i][1],   corners[i][2]),
-        new BABYLON.Vector3(corners[i+1][0], corners[i+1][1], corners[i+1][2])
-      ];
-      var lines = BABYLON.MeshBuilder.CreateLines("domainLine"+i, {points: pts}, scene);
-      lines.color = new BABYLON.Color3(0.5, 0.5, 0.5);
-      lines.isPickable = false;
-    }
-
-    // the solid block
-    var w = dims.xMax - dims.xMin,
-        h = dims.yMax - dims.yMin,
-        d = dims.zMax - dims.zMin;
-    var domainBlock = BABYLON.MeshBuilder.CreateBox("domainBlock", {
-      width: w, height: h, depth: d
-    }, scene);
-    domainBlock.position = new BABYLON.Vector3(
-      (dims.xMax + dims.xMin)/2,
-      (dims.yMax + dims.yMin)/2,
-      (dims.zMax + dims.zMin)/2
-    );
-    domainBlock.isPickable = false;
-
-    var mat = new BABYLON.StandardMaterial("domainMat", scene);
-    mat.diffuseColor = new BABYLON.Color3(1,1,0);   // yellow
-    mat.alpha = 0.3;  // translucent
+    var mat = new BABYLON.StandardMaterial("Mat_"+txt, scene);
+    mat.diffuseTexture = dt;
+    mat.opacityTexture = dt;
     mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-    domainBlock.material = mat;
+    mat.backFaceCulling = false;
+    mat.emissiveColor = color;
+    plane.material = mat;
+
+    plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+    
+    axesObjects.push(plane);
+    return plane;
+  }
+  
+  createAxisLabel("X", new BABYLON.Vector3(size + 1, 0, 0), new BABYLON.Color3(1, 0, 0));
+  createAxisLabel("Y", new BABYLON.Vector3(0, size + 1, 0), new BABYLON.Color3(0, 1, 0));
+  createAxisLabel("Z", new BABYLON.Vector3(0, 0, -size - 1), new BABYLON.Color3(0, 0, 1)); // Flip Z-axis label
+}
+
+//---------------------------------------------------------------
+// 2) Interpreting location for boundary conditions
+//---------------------------------------------------------------
+function interpretLocationComponent(spec, cmin, cmax) {
+  if (spec === ":") return null;  // means "all" in that dimension
+  if (typeof spec === "number") {
+    // if in [0,1], treat as fraction; else absolute coordinate
+    if (spec >= 0 && spec <= 1) {
+      return cmin + spec*(cmax - cmin);
+    } else {
+      return spec;
+    }
+  }
+  if (typeof spec === "string" && spec.trim().endsWith("%")) {
+    var frac = parseFloat(spec.replace("%",""))/100;
+    frac = Math.min(Math.max(frac,0),1);
+    return cmin + frac*(cmax - cmin);
+  }
+  throw "Invalid location component: " + spec;
+}
+
+//---------------------------------------------------------------
+// 3) Create Arrows
+//---------------------------------------------------------------
+function createArrow(name, tip, direction, length, color) {
+  var tail = tip.subtract(direction.scale(length));
+  var shaftHeight = length * 0.8;
+  var coneHeight  = length * 0.2;
+
+  // Cylinder for shaft
+  var shaft = BABYLON.MeshBuilder.CreateCylinder(name+"_shaft", {
+    height: shaftHeight,
+    diameter: 0.3
+  }, scene);
+  shaft.position = tail.add(direction.scale(shaftHeight/2));
+
+  // Cone for arrow tip
+  var cone = BABYLON.MeshBuilder.CreateCylinder(name+"_cone", {
+    height: coneHeight,
+    diameterTop: 0,
+    diameterBottom: 0.6
+  }, scene);
+  cone.position = tip.subtract(direction.scale(coneHeight/2));
+
+  // Rotate so Y-up aligns with direction
+  var defaultDir = new BABYLON.Vector3(0,1,0);
+  var angle = Math.acos(BABYLON.Vector3.Dot(defaultDir, direction));
+  if (angle > 1e-6) {
+    var axis = BABYLON.Vector3.Cross(defaultDir, direction).normalize();
+    var quat = BABYLON.Quaternion.RotationAxis(axis, angle);
+    shaft.rotationQuaternion = quat;
+    cone.rotationQuaternion = quat;
   }
 
-  //---------------------------------------------------------------
-  // 5) Create BC Markers across surfaces, lines, or points
-  //---------------------------------------------------------------
-  function createBCArrows(bc, dims, idx) {
-    var loc = bc.location;     // e.g. [0.0, ":", ":"]
-    var dofs = bc.DoFs || [];  // e.g. [1,2,3]
+  // Merge
+  var mat = new BABYLON.StandardMaterial(name+"_mat", scene);
+  mat.diffuseColor = color || new BABYLON.Color3(1,1,1);
+  var arrow = BABYLON.Mesh.MergeMeshes([shaft, cone], true, false, null, false, true);
+  arrow.material = mat;
+  return arrow;
+}
 
-    // We'll choose a grid spacing:
-    var stepY = 2, stepZ = 1, stepX = 2;  // adjustable as needed
+//---------------------------------------------------------------
+// 4) Create Domain Block (translucent yellow)
+//---------------------------------------------------------------
+function createDomainBlock(dims) {
+  // wireframe lines for the domain
+  var corners = [
+    // bottom
+    [dims.xMin, dims.yMin, dims.zMin], [dims.xMax, dims.yMin, dims.zMin],
+    [dims.xMax, dims.yMin, dims.zMin], [dims.xMax, dims.yMax, dims.zMin],
+    [dims.xMax, dims.yMax, dims.zMin], [dims.xMin, dims.yMax, dims.zMin],
+    [dims.xMin, dims.yMax, dims.zMin], [dims.xMin, dims.yMin, dims.zMin],
+    // top
+    [dims.xMin, dims.yMin, dims.zMax], [dims.xMax, dims.yMin, dims.zMax],
+    [dims.xMax, dims.yMin, dims.zMax], [dims.xMax, dims.yMax, dims.zMax],
+    [dims.xMax, dims.yMax, dims.zMax], [dims.xMin, dims.yMax, dims.zMax],
+    [dims.xMin, dims.yMax, dims.zMax], [dims.xMin, dims.yMin, dims.zMax],
+    // verticals
+    [dims.xMin, dims.yMin, dims.zMin], [dims.xMin, dims.yMin, dims.zMax],
+    [dims.xMax, dims.yMin, dims.zMin], [dims.xMax, dims.yMin, dims.zMax],
+    [dims.xMin, dims.yMax, dims.zMin], [dims.xMin, dims.yMax, dims.zMax],
+    [dims.xMax, dims.yMax, dims.zMin], [dims.xMax, dims.yMax, dims.zMax]
+  ];
+  for (var i=0; i<corners.length; i+=2) {
+    let pts = [
+      new BABYLON.Vector3(corners[i][0],   corners[i][1],   corners[i][2]),
+      new BABYLON.Vector3(corners[i+1][0], corners[i+1][1], corners[i+1][2])
+    ];
+    var lines = BABYLON.MeshBuilder.CreateLines("domainLine"+i, {points: pts}, scene);
+    lines.color = new BABYLON.Color3(0.5, 0.5, 0.5);
+    lines.isPickable = false;
+  }
 
-    // For each dimension, figure out if we are spanning or fixed
-    // We'll build arrays of possible coordinates in x,y,z
-    function coordArray(spec, cMin, cMax, stepSize) {
-      // If ":", we build a range from cMin..cMax with step stepSize
-      // If numeric, we just have one value
-      if (spec === ":") {
-        let arr = [];
-        let cur = cMin;
-        while (cur <= cMax+1e-9) {
-          arr.push(cur);
-          cur += stepSize;
-        }
-        return arr;
-      } else {
-        let val = interpretLocationComponent(spec, cMin, cMax);
-        return [val];
+  // the solid block
+  var w = dims.xMax - dims.xMin,
+      h = dims.yMax - dims.yMin,
+      d = dims.zMax - dims.zMin;
+  var domainBlock = BABYLON.MeshBuilder.CreateBox("domainBlock", {
+    width: w, height: h, depth: d
+  }, scene);
+  domainBlock.position = new BABYLON.Vector3(
+    (dims.xMax + dims.xMin)/2,
+    (dims.yMax + dims.yMin)/2,
+    (dims.zMax + dims.zMin)/2
+  );
+  domainBlock.isPickable = false;
+
+  var mat = new BABYLON.StandardMaterial("domainMat", scene);
+  mat.diffuseColor = new BABYLON.Color3(1,1,0);   // yellow
+  mat.alpha = 0.3;  // translucent
+  mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  domainBlock.material = mat;
+}
+
+//---------------------------------------------------------------
+// 5) Create BC Markers across surfaces, lines, or points
+//---------------------------------------------------------------
+function createBCArrows(bc, dims, idx) {
+  var loc = bc.location;     // e.g. [0.0, ":", ":"]
+  var dofs = bc.DoFs || [];  // e.g. [1,2,3]
+
+  // We'll choose a grid spacing:
+  var stepY = 2, stepZ = 1, stepX = 2;  // adjustable as needed
+
+  // For each dimension, figure out if we are spanning or fixed
+  // We'll build arrays of possible coordinates in x,y,z
+  function coordArray(spec, cMin, cMax, stepSize) {
+    // If ":", we build a range from cMin..cMax with step stepSize
+    // If numeric, we just have one value
+    if (spec === ":") {
+      let arr = [];
+      let cur = cMin;
+      while (cur <= cMax+1e-9) {
+        arr.push(cur);
+        cur += stepSize;
       }
+      return arr;
+    } else {
+      let val = interpretLocationComponent(spec, cMin, cMax);
+      return [val];
     }
+  }
 
-    var xArr = coordArray(loc[0], dims.xMin, dims.xMax, 2.0);
-    var yArr = coordArray(loc[1], dims.yMin, dims.yMax, 1.0);
-    var zArr = coordArray(loc[2], dims.zMin, dims.zMax, 1.0);
+  var xArr = coordArray(loc[0], dims.xMin, dims.xMax, 2.0);
+  var yArr = coordArray(loc[1], dims.yMin, dims.yMax, 1.0);
+  var zArr = coordArray(loc[2], dims.zMin, dims.zMax, 1.0);
 
-    // For each coordinate in xArr × yArr × zArr, create a marker & arrows
-    // We'll color the marker green for BC
-    var bcColor = new BABYLON.Color3(0,1,0);
+  // For each coordinate in xArr × yArr × zArr, create a marker & arrows
+  // We'll color the marker green for BC
+  var bcColor = new BABYLON.Color3(0,1,0);
 
-    xArr.forEach(x => {
-      yArr.forEach(y => {
-        zArr.forEach(z => {
-          // small sphere marker:
-          var marker = BABYLON.MeshBuilder.CreateSphere("BCmarker_" + idx, {diameter:0.3}, scene);
-          marker.position.set(x,y,z);
-          marker.isPickable = false;
-          var mMat = new BABYLON.StandardMaterial("BCmarkerMat_" + idx, scene);
-          mMat.diffuseColor = bcColor;
-          mMat.alpha = 0.5;
-          mMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-          marker.material = mMat;
+  xArr.forEach(x => {
+    yArr.forEach(y => {
+      zArr.forEach(z => {
+        // small sphere marker:
+        var marker = BABYLON.MeshBuilder.CreateSphere("BCmarker_" + idx, {diameter:0.3}, scene);
+        marker.position.set(x,y,z);
+        marker.isPickable = false;
+        var mMat = new BABYLON.StandardMaterial("BCmarkerMat_" + idx, scene);
+        mMat.diffuseColor = bcColor;
+        mMat.alpha = 0.5;
+        mMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+        marker.material = mMat;
 
-          // DOF arrows
-          // DoF=1 => X arrow (red), DoF=2 => Y arrow (green), DoF=3 => Z arrow (blue)
-          if (dofs.includes(1)) {
-            createArrow("BCarrowX_"+idx, marker.position, new BABYLON.Vector3(1,0,0), 0.8, new BABYLON.Color3(1,0,0));
-          }
-          if (dofs.includes(2)) {
-            createArrow("BCarrowY_"+idx, marker.position, new BABYLON.Vector3(0,1,0), 0.8, new BABYLON.Color3(0,1,0));
-          }
-          if (dofs.includes(3)) {
-            createArrow("BCarrowZ_"+idx, marker.position, new BABYLON.Vector3(0,0,1), 0.8, new BABYLON.Color3(0,0,1));
-          }
-        });
+        // DOF arrows
+        // DoF=1 => X arrow (red), DoF=2 => Y arrow (green), DoF=3 => Z arrow (blue)
+        if (dofs.includes(1)) {
+          createArrow("BCarrowX_"+idx, marker.position, new BABYLON.Vector3(1,0,0), 0.8, new BABYLON.Color3(1,0,0));
+        }
+        if (dofs.includes(2)) {
+          createArrow("BCarrowY_"+idx, marker.position, new BABYLON.Vector3(0,1,0), 0.8, new BABYLON.Color3(0,1,0));
+        }
+        if (dofs.includes(3)) {
+          createArrow("BCarrowZ_"+idx, marker.position, new BABYLON.Vector3(0,0,1), 0.8, new BABYLON.Color3(0,0,1));
+        }
       });
     });
+  });
 
-    // Also add one label plane near the "first" or "center" coordinate
-    // to indicate which DoFs are constrained
-    var dofText = "BC: DoFs " + dofs.join(", ");
-    var dt = new BABYLON.DynamicTexture("bcText_" + idx, {width:256, height:64}, scene);
-    dt.hasAlpha = true;
-    dt.drawText(dofText, null, 40, "bold 24px Arial", "white", "transparent");
+  // Also add one label plane near the "first" or "center" coordinate
+  // to indicate which DoFs are constrained
+  var dofText = "BC: DoFs " + dofs.join(", ");
+  var dt = new BABYLON.DynamicTexture("bcText_" + idx, {width:256, height:64}, scene);
+  dt.hasAlpha = true;
+  dt.drawText(dofText, null, 40, "bold 24px Arial", "white", "transparent");
 
-    var textPlane = BABYLON.MeshBuilder.CreatePlane("bcTextPlane_" + idx, {width:5, height:1.5}, scene);
-    textPlane.isPickable = false;
-    var textMat = new BABYLON.StandardMaterial("bcTextMat_" + idx, scene);
-    textMat.diffuseTexture = dt;
-    textMat.opacityTexture = dt;
-    textMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-    textMat.emissiveColor = bcColor;
-    textPlane.material = textMat;
+  var textPlane = BABYLON.MeshBuilder.CreatePlane("bcTextPlane_" + idx, {width:5, height:1.5}, scene);
+  textPlane.isPickable = false;
+  var textMat = new BABYLON.StandardMaterial("bcTextMat_" + idx, scene);
+  textMat.diffuseTexture = dt;
+  textMat.opacityTexture = dt;
+  textMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  textMat.emissiveColor = bcColor;
+  textPlane.material = textMat;
 
-    // Position label near the midpoint of the domain face
-    var midX = (xArr[0] + xArr[xArr.length-1])/2;
-    var midY = (yArr[0] + yArr[yArr.length-1])/2;
-    var midZ = (zArr[0] + zArr[zArr.length-1])/2;
-    textPlane.position.set(midX, midY + 1, midZ);
-    textPlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-  }
+  // Position label near the midpoint of the domain face
+  var midX = (xArr[0] + xArr[xArr.length-1])/2;
+  var midY = (yArr[0] + yArr[yArr.length-1])/2;
+  var midZ = (zArr[0] + zArr[zArr.length-1])/2;
+  textPlane.position.set(midX, midY + 1, midZ);
+  textPlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+}
 
-  //---------------------------------------------------------------
-  // 6) Build the entire scene from the config
-  //---------------------------------------------------------------
- //---------------------------------------------------------------
+
+//---------------------------------------------------------------
 // 6) Build the entire scene from the config
 //---------------------------------------------------------------
 function buildScene(config) {
@@ -476,7 +486,7 @@ function buildScene(config) {
     Object.keys(geom).filter(k=>k.startsWith("sphere")).forEach(key => {
       var s = geom[key];
       var sphere = BABYLON.MeshBuilder.CreateSphere(key, {diameter: s.diameter}, scene);
-      sphere.position.set(s.center[0], s.center[1], s.center[2]);
+      sphere.position.set(s.center[0], s.center[1], -s.center[2]); // Flip Z-axis
 
       // Color: add=blue, remove=red
       var mat = new BABYLON.StandardMaterial(key+"_mat", scene);
@@ -496,7 +506,7 @@ function buildScene(config) {
 
       // expand bounding box
       var radius = s.diameter/2;
-      expandBounds(s.center[0], s.center[1], s.center[2], radius);
+      expandBounds(s.center[0], s.center[1], -s.center[2], radius); // Flip Z-axis
     });
 
     // Boxes
@@ -507,7 +517,7 @@ function buildScene(config) {
         height: b.side, // Use side length for height
         depth: b.side   // Use side length for depth
       }, scene);
-      box.position.set(b.center[0], b.center[1], b.center[2]);
+      box.position.set(b.center[0], b.center[1], -b.center[2]); // Flip Z-axis
 
       // color
       var mat = new BABYLON.StandardMaterial(key+"_mat", scene);
@@ -527,7 +537,7 @@ function buildScene(config) {
 
       // expand bounding box
       var half = b.side/2;
-      expandBounds(b.center[0], b.center[1], b.center[2], half);
+      expandBounds(b.center[0], b.center[1], -b.center[2], half); // Flip Z-axis
     });
 
     // Boundary conditions: create arrow grids
@@ -546,7 +556,7 @@ function buildScene(config) {
         var x = interpretLocationComponent(loc[0], dims.xMin, dims.xMax);
         var y = interpretLocationComponent(loc[1], dims.yMin, dims.yMax);
         var z = interpretLocationComponent(loc[2], dims.zMin, dims.zMax);
-        var point = new BABYLON.Vector3(x,y,z);
+        var point = new BABYLON.Vector3(x,y,-z); // Flip Z-axis
 
         var F = force.F.slice(); // ensure length 3
         while (F.length<3) F.push(0);
@@ -577,7 +587,7 @@ function buildScene(config) {
           pl.position = point.subtract(dir.scale(2)).add(new BABYLON.Vector3(0,1.5,0));
           pl.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
-          expandBounds(point.x, point.y, point.z, 2); 
+          expandBounds(point.x, point.y, -point.z, 2); // Flip Z-axis
         }
       });
     }
@@ -590,7 +600,7 @@ function buildScene(config) {
     var centerX = 0.5*(minX + maxX);
     var centerY = 0.5*(minY + maxY);
     var centerZ = 0.5*(minZ + maxZ);
-    camera.target = new BABYLON.Vector3(centerX, centerY, centerZ);
+    camera.target = new BABYLON.Vector3(centerX, centerY, -centerZ); // Flip Z-axis
 
     // Diagonal length
     var dx = maxX - minX;
@@ -599,10 +609,6 @@ function buildScene(config) {
     var diag = Math.sqrt(dx*dx + dy*dy + dz*dz);
     camera.radius = diag * 1.2; // Zoom out enough to see everything
 }
-
-
-
-
 
 
   //---------------------------------------------------------------
@@ -621,7 +627,7 @@ function buildScene(config) {
           currentConfig.geometry[configKey].center = [
             mesh.position.x,
             mesh.position.y,
-            mesh.position.z
+            -mesh.position.z // Flip Z-axis
           ];
         }
       }
@@ -652,29 +658,78 @@ function buildScene(config) {
   // Disable download button initially
   downloadBtn.disabled = true;
 
-  //---------------------------------------------------------------
-  // File input
-  //---------------------------------------------------------------
-  document.getElementById("fileInput").addEventListener("change", function(e) {
-    var file = e.target.files[0];
-    if (!file) return;
-    document.getElementById("instructions").textContent = "Loading file...";
-
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-      try {
-        var config = JSON.parse(ev.target.result);
-        buildScene(config);
-        document.getElementById("instructions").textContent = "File loaded successfully. You can now drag objects and download the modified configuration.";
-        downloadBtn.disabled = false;
-      } catch(err) {
-        console.error("JSON parse error:", err);
-        alert("Error parsing JSON: " + err);
-        document.getElementById("instructions").textContent = "Error loading file. Please try again.";
-      }
-    };
-    reader.readAsText(file);
+//---------------------------------------------------------------
+// Clear scene except permanent objects
+//---------------------------------------------------------------
+function clearScene() {
+  scene.meshes.slice().forEach(m => {
+    if (!permanentObjects.includes(m.name)) {
+      m.dispose(); // Dispose of all non-permanent meshes
+    }
   });
+
+  // Clear gizmo attachable meshes
+  gizmoManager.attachableMeshes = [];
+  gizmoManager.attachToMesh(null);
+
+  // Reset the mesh to config map
+  meshToConfigMap.clear();
+
+  // Clear axes objects array
+  axesObjects.forEach(obj => {
+    if (obj) obj.dispose();
+  });
+  axesObjects = [];
+
+  // Reset object info
+  objectInfoDiv.textContent = "No object selected";
+}
+
+//---------------------------------------------------------------
+// File input
+//---------------------------------------------------------------
+document.getElementById("fileInput").addEventListener("change", function(e) {
+  var file = e.target.files[0];
+  if (!file) {
+    alert("No file selected. Please choose a JSON file.");
+    return;
+  }
+
+  // Clear the scene before loading a new configuration
+  clearScene();
+
+  document.getElementById("instructions").textContent = "Loading file...";
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var config = JSON.parse(ev.target.result);
+      console.log("File loaded successfully:", config); // Debugging: Log the loaded config
+      buildScene(config);
+      document.getElementById("instructions").textContent = "File loaded successfully. You can now drag objects and download the modified configuration.";
+      downloadBtn.disabled = false;
+    } catch(err) {
+      console.error("JSON parse error:", err);
+      alert("Error parsing JSON: " + err);
+      document.getElementById("instructions").textContent = "Error loading file. Please try again.";
+    }
+  };
+
+  reader.onerror = function(ev) {
+    console.error("File read error:", ev.target.error);
+    alert("Error reading file. Please try again.");
+    document.getElementById("instructions").textContent = "Error reading file. Please try again.";
+  };
+
+  // Force the file to be read fresh every time
+  reader.readAsText(file);
+});
+
+
+
+
+
+
 
   //---------------------------------------------------------------
   // Setup mesh selection and gizmo handling

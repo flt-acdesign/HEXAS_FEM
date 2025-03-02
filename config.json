@@ -7,25 +7,31 @@
 
     "sphere1": {
       "type": "sphere",
-      "center": [7.0, 5.0, 4.0],
+      "center": [12.51, 5.0, -0.0],
       "diameter": 8.0,
-      "action": "add"
+      "action": "remove"
     },
     "sphere2": {
       "type": "sphere",
       "center": [9.0, 5.0, 2.0],
-      "diameter": 8.0,
+      "diameter": 4.0,
+      "action": "add"
+    },
+    "sphere3": {
+      "type": "sphere",
+      "center": [19.0, 5.0, 2.0],
+      "diameter": 4.0,
       "action": "remove"
     },
     "box2": {
       "type": "box",
-      "center": [19.0, 7.0, -10.0],
+      "center": [19.0, 7.0, -0.55],
       "side": 4.0,
       "action": "remove"
     },
     "box1": {
       "type": "box",
-      "center": [21.0, 7.0, 4.0],
+      "center": [28.0, 7.0, 2.5],
       "side": 2.0,
       "action": "add"
     }
