@@ -114,58 +114,46 @@ The code is modular and organized into several submodules, each responsible for 
 This solver is designed for educational and research purposes and can be extended to support more advanced features like nonlinear materials, dynamic analysis, or multi-physics simulations.
 
 
-Solver Selection Logic
-The solver selection logic is primarily implemented in the choose_solver function within the HEXA module. This function determines which solver to use based on the problem size and available hardware (CPU or GPU). Here's a breakdown of the logic:
+The code you provided is a comprehensive finite element analysis (FEA) solver written in Julia, specifically designed for solving 3D structural mechanics problems using hexahedral elements. The solver is modular, with different components handling various aspects of the FEA process, such as mesh generation, boundary conditions, material properties, and solving the system of equations. Below is an explanation of the logic for the selection of the linear solver in the code:
 
-GPU Availability Check:
+### Solver Selection Logic
 
-The function first checks if a GPU is available using CUDA.functional().
+The solver selection logic is primarily implemented in the `choose_solver` function within the `HEXA` module. This function determines which solver to use based on the problem size and available hardware (CPU or GPU). Here's a breakdown of the logic:
 
-If a GPU is available, it further checks if there is enough GPU memory to handle the problem using Helpers.has_enough_gpu_memory(nNodes, nElem).
+1. **GPU Availability Check**:
+   - The function first checks if a GPU is available using `CUDA.functional()`.
+   - If a GPU is available, it further checks if there is enough GPU memory to handle the problem using `Helpers.has_enough_gpu_memory(nNodes, nElem)`.
+   - If both conditions are met, the function returns `:gpu`, indicating that the GPU solver should be used.
 
-If both conditions are met, the function returns :gpu, indicating that the GPU solver should be used.
+2. **CPU Solver Selection**:
+   - If a GPU is not available or there isn't enough GPU memory, the function falls back to using a CPU solver.
+   - The function then checks the number of elements (`nElem`):
+     - If `nElem` is less than 100,001, the function selects the **direct solver** (`:direct`), which is typically faster for smaller problems.
+     - If `nElem` is 100,001 or more, the function selects the **matrix-free iterative solver** (`:matrix_free`), which is more memory-efficient and suitable for larger problems.
 
-CPU Solver Selection:
+### Solver Implementation
 
-If a GPU is not available or there isn't enough GPU memory, the function falls back to using a CPU solver.
+The selected solver is then used in the `run_main` function, where the actual solving takes place:
 
-The function then checks the number of elements (nElem):
+- **Direct Solver**:
+  - The direct solver is implemented in the `DirectSolver` module.
+  - It assembles the global stiffness matrix and solves the system using LU factorization.
+  - This method is efficient for small to moderately sized problems but can be memory-intensive for very large problems.
 
-If nElem is less than 100,001, the function selects the direct solver (:direct), which is typically faster for smaller problems.
+- **Matrix-Free Iterative Solver (CPU)**:
+  - The matrix-free iterative solver is implemented in the `CPUSolver` module.
+  - It uses a conjugate gradient (CG) method with a diagonal preconditioner.
+  - This method is memory-efficient and suitable for large problems because it does not require storing the entire stiffness matrix.
 
-If nElem is 100,001 or more, the function selects the matrix-free iterative solver (:matrix_free), which is more memory-efficient and suitable for larger problems.
+- **GPU Solver**:
+  - The GPU solver is implemented in the `GPUSolver` module.
+  - It can use either a native GPU-accelerated CG solver or a more advanced Krylov solver (e.g., CG, MINRES, or BiCGSTAB) with optional IC(0) preconditioning.
+  - The GPU solver is designed to leverage the parallel processing capabilities of GPUs, making it suitable for very large problems.
 
-Solver Implementation
-The selected solver is then used in the run_main function, where the actual solving takes place:
+### Solver Dispatch
 
-Direct Solver:
+The `solve_system_iterative` function in the `IterativeSolver` module is responsible for dispatching the problem to the appropriate solver based on the `solver_type` argument:
 
-The direct solver is implemented in the DirectSolver module.
-
-It assembles the global stiffness matrix and solves the system using LU factorization.
-
-This method is efficient for small to moderately sized problems but can be memory-intensive for very large problems.
-
-Matrix-Free Iterative Solver (CPU):
-
-The matrix-free iterative solver is implemented in the CPUSolver module.
-
-It uses a conjugate gradient (CG) method with a diagonal preconditioner.
-
-This method is memory-efficient and suitable for large problems because it does not require storing the entire stiffness matrix.
-
-GPU Solver:
-
-The GPU solver is implemented in the GPUSolver module.
-
-It can use either a native GPU-accelerated CG solver or a more advanced Krylov solver (e.g., CG, MINRES, or BiCGSTAB) with optional IC(0) preconditioning.
-
-The GPU solver is designed to leverage the parallel processing capabilities of GPUs, making it suitable for very large problems.
-
-Solver Dispatch
-The solve_system_iterative function in the IterativeSolver module is responsible for dispatching the problem to the appropriate solver based on the solver_type argument:
-
-If solver_type is :matrix_free, it calls the CPU-based matrix-free solver.
-
-If solver_type is :gpu, it calls the GPU-based solver, with options for different Krylov solvers and preconditioning.
+- If `solver_type` is `:matrix_free`, it calls the CPU-based matrix-free solver.
+- If `solver_type` is `:gpu`, it calls the GPU-based solver, with options for different Krylov solvers and preconditioning.
 
