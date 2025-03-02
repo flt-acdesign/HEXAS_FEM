@@ -1,0 +1,50 @@
+{
+  "geometry": {
+    "length_x": 40.0,
+    "length_y": 10.0,
+    "length_z": 2.0,
+    "target_elem_count": 85000,
+
+    "sphere1": {
+      "type": "sphere",
+      "center": [7.0, 5.0, 4.0],
+      "diameter": 8.0,
+      "action": "add"
+    },
+    "sphere2": {
+      "type": "sphere",
+      "center": [9.0, 5.0, 2.0],
+      "diameter": 8.0,
+      "action": "remove"
+    },
+    "box2": {
+      "type": "box",
+      "center": [19.0, 7.0, -10.0],
+      "side": 4.0,
+      "action": "remove"
+    },
+    "box1": {
+      "type": "box",
+      "center": [21.0, 7.0, 4.0],
+      "side": 2.0,
+      "action": "add"
+    }
+
+  },
+  "boundary_conditions": [
+    {
+      "location": [0.0, ":", ":"],
+      "DoFs": [1, 2, 3]
+    }
+  ],
+  "external_forces": [
+    {
+      "location": [1.0, 0.0, 0.0],
+      "F": [0.0, 10.0, 0.0]
+    }
+  ],
+  "material": {
+    "E": 2.1e11,
+    "nu": 0.3
+  }
+}
