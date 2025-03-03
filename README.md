@@ -37,6 +37,8 @@ The code is modular and organized into several submodules, each responsible for 
      Pkg.add("JSON")
      Pkg.add("Printf")
      Pkg.add("Dates")
+     Pkg.add("Krylov")
+     Pkg.add("LinearOperators")
      ```
 
 2. **Configuration**:
