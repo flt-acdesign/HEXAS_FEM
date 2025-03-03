@@ -136,8 +136,6 @@ The code is modular and organized into several submodules, each responsible for 
 This solver is designed for educational and research purposes and can be extended to support more advanced features like nonlinear materials, dynamic analysis, or multi-physics simulations.
 
 
-The code you provided is a comprehensive finite element analysis (FEA) solver written in Julia, specifically designed for solving 3D structural mechanics problems using hexahedral elements. The solver is modular, with different components handling various aspects of the FEA process, such as mesh generation, boundary conditions, material properties, and solving the system of equations. Below is an explanation of the logic for the selection of the linear solver in the code:
-
 ### Solver Selection Logic
 
 The solver selection logic is primarily implemented in the `choose_solver` function within the `HEXA` module. This function determines which solver to use based on the problem size and available hardware (CPU or GPU). Here's a breakdown of the logic:
