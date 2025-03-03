@@ -75,30 +75,38 @@ The code is modular and organized into several submodules, each responsible for 
     "length_y": 10.0,
     "length_z": 2.0,
     "target_elem_count": 85000,
+
     "sphere1": {
       "type": "sphere",
-      "center": [7.0, 5.0, 4.0],
+      "center": [12.51, 5.0, -0.0],
       "diameter": 8.0,
-      "action": "add"
+      "action": "remove"
     },
     "sphere2": {
       "type": "sphere",
       "center": [9.0, 5.0, 2.0],
-      "diameter": 8.0,
+      "diameter": 4.0,
+      "action": "add"
+    },
+    "sphere3": {
+      "type": "sphere",
+      "center": [19.0, 5.0, 2.0],
+      "diameter": 4.0,
       "action": "remove"
     },
-    "box1: {
+    "box2": {
       "type": "box",
       "center": [19.0, 7.0, -0.55],
       "side": 4.0,
       "action": "remove"
     },
-    "box2": {
+    "box1": {
       "type": "box",
       "center": [28.0, 7.0, 2.5],
       "side": 2.0,
       "action": "add"
     }
+
   },
   "boundary_conditions": [
     {
