@@ -86,6 +86,18 @@ The code is modular and organized into several submodules, each responsible for 
       "center": [9.0, 5.0, 2.0],
       "diameter": 8.0,
       "action": "remove"
+    },
+    "box1: {
+      "type": "box",
+      "center": [19.0, 7.0, -0.55],
+      "side": 4.0,
+      "action": "remove"
+    },
+    "box2": {
+      "type": "box",
+      "center": [28.0, 7.0, 2.5],
+      "side": 2.0,
+      "action": "add"
     }
   },
   "boundary_conditions": [
